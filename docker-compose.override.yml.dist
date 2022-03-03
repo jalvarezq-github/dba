@@ -1,0 +1,27 @@
+version: "3.7"
+services:
+  php:
+    volumes:
+      - .:/application
+    environment:
+      LINIO_ENV: local
+      XDEBUG_CONFIG: remote_host=host.docker.internal
+
+  nginx:
+    ports:
+      - "8000:80"
+    environment:
+      VIRTUAL_HOST: api-skeleton.localhost
+      NGINX_HOST: api-skeleton.localhost
+      PHP_FPM_HOST: php
+    volumes:
+      - .:/application
+
+  docs:
+    ports:
+      - "10000:80"
+    environment:
+      VIRTUAL_HOST: api-skeleton-docs.localhost
+      NGINX_HOST: api-skeleton-docs.localhost
+    volumes:
+      - ./dist:/application/public

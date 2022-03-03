@@ -1,0 +1,203 @@
+version: '1.0'
+stages:
+  - clone
+  - build
+  - test
+  - deploy
+steps:
+  main_clone:
+    title: Clone repository
+    stage: clone
+    type: git-clone
+    repo: ${{CF_REPO_OWNER}}/${{CF_REPO_NAME}}
+    revision: ${{CF_SHORT_REVISION}}
+    git: github
+  setup_github_token:
+    title: Setup GitHub token
+    stage: clone
+    image: codefresh/cli
+    commands:
+      - echo GITHUB_TOKEN=$(codefresh get context github --decrypt -o yaml | yq -r .spec.data.auth.password) >> ${{CF_VOLUME_PATH}}/env_vars_to_export
+  build_test_images:
+    title: Build test images
+    stage: build
+    type: parallel
+    steps:
+      build_js_test:
+        title: 'Build image: js-test'
+        type: build
+        image_name: ${{CF_REPO_NAME}}-js-test
+        dockerfile: docker/nginx/Dockerfile
+        target: DEVELOPMENT
+        build_arguments:
+          - GITHUB_TOKEN=${{GITHUB_TOKEN}}
+        tag: ${{CF_SHORT_REVISION}}
+      build_php_test:
+        title: 'Build image: php-test'
+        type: build
+        image_name: ${{CF_REPO_NAME}}-php-test
+        dockerfile: docker/php/Dockerfile
+        target: DEVELOPMENT
+        build_arguments:
+          - GITHUB_TOKEN=${{GITHUB_TOKEN}}
+        tag: ${{CF_SHORT_REVISION}}
+  build_images:
+    title: Build images
+    stage: build
+    type: parallel
+    steps:
+      build_nginx:
+        title: 'Build image: nginx'
+        type: build
+        image_name: ${{CF_REPO_NAME}}-nginx
+        dockerfile: docker/nginx/Dockerfile
+        build_arguments:
+          - GITHUB_TOKEN=${{GITHUB_TOKEN}}
+        tag: ${{CF_SHORT_REVISION}}
+      build_php:
+        title: 'Build image: php'
+        type: build
+        image_name: ${{CF_REPO_NAME}}-php
+        dockerfile: docker/php/Dockerfile
+        build_arguments:
+          - GITHUB_TOKEN=${{GITHUB_TOKEN}}
+        tag: ${{CF_SHORT_REVISION}}
+      build_docs:
+        title: 'Build image: docs'
+        stage: build
+        type: build
+        image_name: ${{CF_REPO_NAME}}-docs
+        dockerfile: docker/docs/Dockerfile
+        build_arguments:
+          - GITHUB_TOKEN=${{GITHUB_TOKEN}}
+        tag: ${{CF_SHORT_REVISION}}
+  tests:
+    title: Tests
+    stage: test
+    type: parallel
+    steps:
+      lint_api:
+        title: Lint API
+        image: ${{build_js_test}}
+        working_directory: IMAGE_WORK_DIR
+        commands:
+          - yarn lint:api
+      lint_misc:
+        title: Lint misc
+        image: ${{build_js_test}}
+        working_directory: IMAGE_WORK_DIR
+        commands:
+          - yarn lint:check
+      security_check:
+        title: PHP dependency security check
+        image: ${{build_php_test}}
+        working_directory: IMAGE_WORK_DIR
+        commands:
+          - vendor/bin/security-checker security:check
+      test_php:
+        title: Run PHP tests
+        image: ${{build_php_test}}
+        working_directory: IMAGE_WORK_DIR
+        commands:
+          - composer test
+  push_images:
+    type: parallel
+    title: Push images
+    stage: deploy
+    steps:
+      push_nginx:
+        title: 'Push image: nginx'
+        type: push
+        registry: gcr
+        candidate: ${{build_nginx}}
+        tags:
+          - latest
+          - ${{CF_SHORT_REVISION}}
+      push_php:
+        title: 'Push image: php'
+        type: push
+        registry: gcr
+        candidate: ${{build_php}}
+        tags:
+          - latest
+          - ${{CF_SHORT_REVISION}}
+      push_docs:
+        title: 'Push image: docs'
+        type: push
+        registry: gcr
+        candidate: ${{build_docs}}
+        tags:
+          - latest
+          - ${{CF_SHORT_REVISION}}
+    when:
+      branch:
+        only:
+          - master
+      condition:
+        all:
+          isNotPr: 'includes("${{CF_PULL_REQUEST_NUMBER}}", "CF_PULL_REQUEST_NUMBER") == true'
+  push_review_app_images:
+    type: parallel
+    title: Push Review App images
+    stage: deploy
+    steps:
+      push_review_app_nginx:
+        title: 'Push Review App image: nginx'
+        type: push
+        registry: gcr
+        candidate: ${{build_nginx}}
+        tags:
+          - ${{CF_SHORT_REVISION}}
+      push_review_app_php:
+        title: 'Push Review App image: php'
+        type: push
+        registry: gcr
+        candidate: ${{build_php}}
+        tags:
+          - ${{CF_SHORT_REVISION}}
+      push_review_app_docs:
+        title: 'Push Review App image: docs'
+        type: push
+        registry: gcr
+        candidate: ${{build_docs}}
+        tags:
+          - ${{CF_SHORT_REVISION}}
+    when:
+      condition:
+        all:
+          isPr: 'includes("${{CF_PULL_REQUEST_NUMBER}}", "CF_PULL_REQUEST_NUMBER") == false'
+  deploy_review_app:
+    stage: deploy
+    title: 'Deploy Review App'
+    type: linioit/review-app
+    when:
+      condition:
+        all:
+          isPr: 'includes("${{CF_PULL_REQUEST_NUMBER}}", "CF_PULL_REQUEST_NUMBER") == false'
+  add_comment_for_review_app:
+    title: Comment for link to review app
+    type: kostis-codefresh/github-pr-comment
+    stage: deploy
+    fail_fast: false
+    arguments:
+      PR_COMMENT_TEXT: |
+        Your review app is ready at: https://${{CF_REPO_NAME}}-${{CF_PULL_REQUEST_NUMBER}}.reviewapps.linio-staging.com/
+      GIT_PROVIDER_NAME: github
+    when:
+      condition:
+        all:
+          isPr: 'includes("${{CF_PULL_REQUEST_NUMBER}}", "CF_PULL_REQUEST_NUMBER") == false'
+  deploy_staging:
+    title: Deploy to staging
+    stage: deploy
+    type: linioit/deploy-app
+    arguments:
+      VERSION: ${{CF_SHORT_REVISION}}
+      LINIO_ENV: staging
+    when:
+      branch:
+        only:
+          - master
+      condition:
+        all:
+          isNotPr: 'includes("${{CF_PULL_REQUEST_NUMBER}}", "CF_PULL_REQUEST_NUMBER") == true'

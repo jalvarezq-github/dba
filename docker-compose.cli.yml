@@ -1,0 +1,38 @@
+version: '3.7'
+services:
+  php-cs-fixer:
+    image: gcr.io/linio-support/api-skeleton-php:${IMAGE_TAG:-latest}
+    init: true
+    volumes:
+      - .:/application
+    entrypoint: vendor/bin/php-cs-fixer
+    command: fix --verbose --show-progress=estimating
+
+  composer:
+    image: gcr.io/linio-support/api-skeleton-php:${IMAGE_TAG:-latest}
+    init: true
+    volumes:
+      - .:/application
+      - composer-cache:/root/.composer/cache
+      - ${COMPOSER_HOME:-~/.composer}/auth.json:/root/.composer/auth.json
+    entrypoint: composer
+
+  php:
+    image: gcr.io/linio-support/api-skeleton-php:${IMAGE_TAG:-latest}
+    init: true
+    volumes:
+      - .:/application
+
+  yarn:
+    image: gcr.io/linio-support/docker-node:10-0.2.9
+    init: true
+    volumes:
+      - .:/application
+      - yarn-cache:/root/.cache/yarn/v1
+    entrypoint: yarn
+
+volumes:
+  yarn-cache:
+    name: yarn-cache
+  composer-cache:
+    name: composer-cache

@@ -1,0 +1,33 @@
+{
+  "name": "api-skeleton",
+  "version": "1.0.0",
+  "description": "Linio's API Skeleton",
+  "repository": "git@github.com:LinioIT/api-skeleton.git",
+  "license": "proprietary",
+  "private": true,
+  "devDependencies": {
+    "@stoplight/prism-cli": "^3.2.9",
+    "@stoplight/spectral": "^5.1.0",
+    "husky": "^4.2.3",
+    "lint-staged": "^10.0.8",
+    "prettier": "^1.19.1",
+    "redoc-cli": "^0.9.6"
+  },
+  "scripts": {
+    "mock": "prism mock -d docs/openapi.yaml",
+    "lint": "prettier --write './**/*.{js,json,css,md,yml,yaml}'",
+    "lint:check": "prettier --list-different './**/*.{js,json,css,md,yml,yaml}'",
+    "lint:api": "spectral lint docs/openapi.yaml",
+    "build:docs": "redoc-cli bundle docs/openapi.yaml --disableGoogleFont -o dist/index.html --title \"API Skeleton - API Documentation\""
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged && yarn lint:api"
+    }
+  },
+  "lint-staged": {
+    "*.{js,json,css,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

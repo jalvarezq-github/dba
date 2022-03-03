@@ -1,0 +1,55 @@
+openapi: '3.0.0'
+tags:
+  - name: api
+    description: Core API endpoints
+servers:
+  - url: https://api-skeleton.linio-development.com
+    description: Development server
+info:
+  version: '1.0'
+  title: API Skeleton
+  description: 'This should be replaced'
+  contact:
+    name: Linio
+    url: 'https://linio.com'
+    email: 'it@linio.com'
+  license:
+    name: MIT
+    url: 'https://github.com/LinioIT/api-skeleton/'
+paths:
+  /:
+    get:
+      summary: Application manifest
+      description: Returns a manifest of the API
+      tags:
+        - api
+      operationId: index
+      responses:
+        '200':
+          description: The application's manifest
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: '2020-03-03T15:45:02.000+01:00'
+  /_healthcheck:
+    get:
+      summary: Application healthcheck
+      description: Returns a response if the application is reachable.
+      tags:
+        - api
+      operationId: healthcheck
+      responses:
+        '200':
+          description: The application is responding
+          content:
+            text/html:
+              schema:
+                type: string
+                example: 'OK!'
+        '500':
+          description: There's a problem with the application

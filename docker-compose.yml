@@ -1,0 +1,23 @@
+version: '3.7'
+services:
+  php:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      args:
+        - GITHUB_TOKEN
+    image: gcr.io/linio-support/api-skeleton-php:${IMAGE_TAG:-latest}
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+    image: gcr.io/linio-support/api-skeleton-nginx:${IMAGE_TAG:-latest}
+    depends_on:
+      - php
+
+  docs:
+    build:
+      context: .
+      dockerfile: docker/docs/Dockerfile
+    image: gcr.io/linio-support/api-skeleton-docs:${IMAGE_TAG:-latest}

@@ -1,0 +1,7 @@
+index:
+  path: /
+  controller: Linio\Bundle\ApiBundle\Action\Manifest
+
+healthCheck:
+  path: /_healthcheck
+  controller: Linio\Bundle\ApiBundle\Action\HealthCheck
